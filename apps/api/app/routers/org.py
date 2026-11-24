@@ -27,24 +27,53 @@ from app.services.org import build_org_chart, seed_startup_default
 router = APIRouter(prefix="/companies/{company_id}", tags=["org"])
 
 
-@router.get("/org", response_model=OrgSnapshot)
+@router.get("/org")
 def get_org(
     company_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
-) -> OrgSnapshot:
+) -> dict:
     require_membership(db, company_id, user.id)
+    from app.models.work import Task
+
     departments = (
         db.query(Department).filter(Department.company_id == company_id).order_by(Department.name).all()
     )
     employees = db.query(Employee).filter(Employee.company_id == company_id).order_by(Employee.title).all()
     ceo = next((e for e in employees if e.codename == "ceo"), None)
-    return OrgSnapshot(
-        departments=[DepartmentOut.model_validate(d) for d in departments],
-        employees=[EmployeeOut.model_validate(e) for e in employees],
-        chart=build_org_chart(employees),
-        ceo=EmployeeOut.model_validate(ceo) if ceo else None,
-    )
+    floor = []
+    for e in employees:
+        task = (
+            db.query(Task)
+            .filter(
+                Task.company_id == company_id,
+                Task.assignee_employee_id == e.id,
+                Task.status.in_(("ready", "running", "blocked")),
+            )
+            .order_by(Task.updated_at.desc())
+            .first()
+        )
+        work_state = "idle"
+        if e.status == "paused":
+            work_state = "paused"
+        elif task:
+            work_state = "blocked" if task.status == "blocked" else "working"
+        floor.append(
+            {
+                **EmployeeOut.model_validate(e).model_dump(),
+                "work_state": work_state,
+                "current_task": (
+                    {"id": str(task.id), "title": task.title, "status": task.status} if task else None
+                ),
+            }
+        )
+    return {
+        "departments": [DepartmentOut.model_validate(d) for d in departments],
+        "employees": [EmployeeOut.model_validate(e) for e in employees],
+        "chart": build_org_chart(employees),
+        "ceo": EmployeeOut.model_validate(ceo) if ceo else None,
+        "floor": floor,
+    }
 
 
 @router.post("/org/seed", response_model=OrgSnapshot)

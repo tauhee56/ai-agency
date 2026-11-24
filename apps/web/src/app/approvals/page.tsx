@@ -16,11 +16,32 @@ type Approval = {
   decision_note: string | null;
 };
 
-const WAITING_LABELS: Record<string, string> = {
-  founder: "Needs you (Founder decision)",
-  ci: "Waiting on CI",
-  external: "Waiting on external",
-};
+const SECTIONS: { key: string; title: string; blurb: string }[] = [
+  {
+    key: "founder",
+    title: "Needs your decision",
+    blurb: "The company is waiting on you as Founder.",
+  },
+  {
+    key: "ci",
+    title: "Waiting on checks",
+    blurb: "Work is paused until automated checks finish.",
+  },
+  {
+    key: "external",
+    title: "Waiting outside the company",
+    blurb: "Blocked on something external — vendor, partner, or tool.",
+  },
+];
+
+function humanPayload(payload: Record<string, unknown>): string {
+  const skip = new Set(["adapter", "dispatch_id", "raw", "stub"]);
+  const bits = Object.entries(payload)
+    .filter(([k]) => !skip.has(k))
+    .slice(0, 4)
+    .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
+  return bits.join(" · ") || "Details on file";
+}
 
 export default function ApprovalsPage() {
   const [rows, setRows] = useState<Approval[]>([]);
@@ -46,6 +67,11 @@ export default function ApprovalsPage() {
     return by;
   }, [rows]);
 
+  const inboxCount = useMemo(
+    () => rows.filter((r) => r.status === "pending" && (r.waiting_on || "founder") === "founder").length,
+    [rows]
+  );
+
   async function decide(id: string, decision: "approved" | "rejected", note?: string) {
     const companyId = getActiveCompany();
     if (!companyId) return;
@@ -62,14 +88,8 @@ export default function ApprovalsPage() {
         ];
     return (
       <div key={a.id} className="rounded-xl border border-white/10 bg-ink-900/50 p-4">
-        <div className="flex justify-between gap-3">
-          <div>
-            <div className="font-medium">{a.title}</div>
-            <div className="text-xs text-mist-500 mt-1 font-mono">
-              {a.action_tag} · waiting_on={a.waiting_on || "founder"} · {a.status}
-            </div>
-          </div>
-        </div>
+        <div className="font-medium">{a.title}</div>
+        <p className="text-xs text-mist-500 mt-1">{humanPayload(a.payload)}</p>
         {a.status === "pending" ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {actions.map((s) => (
@@ -89,43 +109,44 @@ export default function ApprovalsPage() {
         ) : (
           <span className="text-xs text-mist-400 mt-2 inline-block">{a.decision_note}</span>
         )}
-        <pre className="mt-2 text-xs text-mist-400 whitespace-pre-wrap">
-          {JSON.stringify(a.payload, null, 2)}
-        </pre>
       </div>
     );
   }
 
   return (
-    <Shell title="Needs you">
+    <Shell title="Needs you" subtitle="Company inbox — decisions only you can make">
       <div className="space-y-6 max-w-3xl">
         <div className="surface rounded-2xl p-6 shadow-panel">
-          <p className="text-sm text-mist-400">
-            Orca-style waiting reasons: Founder decision vs CI vs external. Suggested actions appear on each
-            gate.
+          <p className="text-sm text-mist-300">
+            {inboxCount
+              ? `${inboxCount} item${inboxCount === 1 ? "" : "s"} waiting on you as Founder.`
+              : "Inbox clear — the company isn’t waiting on a Founder decision right now."}
           </p>
         </div>
         {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-        {(["founder", "ci", "external"] as const).map((key) => (
-          <section key={key} className="surface rounded-2xl p-5 shadow-panel space-y-3">
-            <h2 className="font-display text-lg">{WAITING_LABELS[key]}</h2>
-            {!grouped[key].length ? (
+        {SECTIONS.map((section) => (
+          <section key={section.key} className="surface rounded-2xl p-5 shadow-panel space-y-3">
+            <div>
+              <h2 className="font-display text-lg">{section.title}</h2>
+              <p className="text-xs text-mist-500 mt-1">{section.blurb}</p>
+            </div>
+            {!grouped[section.key]?.length ? (
               <p className="text-sm text-mist-500">None</p>
             ) : (
-              grouped[key].map(renderCard)
+              grouped[section.key].map(renderCard)
             )}
           </section>
         ))}
 
         <section className="surface rounded-2xl p-5 shadow-panel space-y-3">
-          <h2 className="font-display text-lg">Resolved</h2>
+          <h2 className="font-display text-lg">Recently decided</h2>
           {rows
             .filter((r) => r.status !== "pending")
             .slice(0, 10)
             .map(renderCard)}
           {!rows.some((r) => r.status !== "pending") ? (
-            <p className="text-sm text-mist-500">No resolved approvals yet.</p>
+            <p className="text-sm text-mist-500">No decisions yet.</p>
           ) : null}
         </section>
       </div>

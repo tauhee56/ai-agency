@@ -193,7 +193,7 @@ export default function PlaybooksPage() {
   }
 
   return (
-    <Shell title="Playbooks">
+    <Shell title="Playbooks" subtitle="Settings · repeatable department routines">
       <div className="space-y-6">
         <section className="grid sm:grid-cols-4 gap-3">
           {[
@@ -225,8 +225,8 @@ export default function PlaybooksPage() {
               <div key={p.id} className="rounded-xl border border-white/10 p-4">
                 <div className="font-medium">{p.name}</div>
                 <div className="text-xs text-mist-500 mt-1">
-                  {p.department} · {p.adapter}
-                  {p.requires_metagpt ? " · MetaGPT required" : ""}
+                  {p.department}
+                  {p.requires_metagpt ? " · needs advanced research capability" : ""}
                 </div>
                 <p className="text-sm text-mist-300 mt-2">{p.description}</p>
                 <button

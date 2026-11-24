@@ -11,7 +11,7 @@ export default function Home() {
   }, [router]);
   return (
     <div className="min-h-screen grid place-items-center bg-ink-950 bg-aurora">
-      <p className="text-mist-400 text-sm">Opening AI Company OS…</p>
+      <p className="text-mist-400 text-sm">Opening your company…</p>
     </div>
   );
 }

@@ -2,16 +2,18 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Pause, Play, Plus, Sprout } from "lucide-react";
+import { Pause, Play, Plus } from "lucide-react";
 import { Shell } from "@/components/shell";
 import {
   api,
   getActiveCompany,
   type Department,
   type Employee,
+  type FloorPerson,
   type OrgChartNode,
   type OrgSnapshot,
 } from "@/lib/api";
+import { workStateLabel } from "@/lib/company-copy";
 import { cn } from "@/lib/cn";
 
 function ChartNode({
@@ -24,7 +26,6 @@ function ChartNode({
   deptName: (id: string | null) => string;
 }) {
   const e = node.employee;
-  const tags = Array.isArray(e.capabilities?.tags) ? (e.capabilities.tags as string[]) : [];
   return (
     <div className={cn(depth > 0 && "ml-6 border-l border-white/10 pl-4")}>
       <div className="relative mb-3 rounded-xl border border-white/10 bg-ink-900/70 px-4 py-3">
@@ -34,36 +35,17 @@ function ChartNode({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="font-medium">{e.title}</div>
-            <div className="text-xs text-mist-400 font-mono mt-0.5">@{e.codename}</div>
-            <div className="text-xs text-mist-500 mt-1">{deptName(e.department_id)}</div>
+            <div className="text-xs text-mist-400 mt-0.5">{deptName(e.department_id)}</div>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <span
-              className={cn(
-                "text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 border",
-                e.status === "active"
-                  ? "border-accent/30 text-accent"
-                  : e.status === "paused"
-                    ? "border-warn/40 text-warn"
-                    : "border-white/15 text-mist-500"
-              )}
-            >
-              {e.status}
-            </span>
-            {e.adapter_pref ? (
-              <span className="text-[10px] text-mist-500 font-mono">{e.adapter_pref}</span>
-            ) : null}
-          </div>
+          <span
+            className={cn(
+              "text-[10px] uppercase tracking-wider",
+              e.status === "active" ? "text-accent" : "text-mist-500"
+            )}
+          >
+            {e.status === "active" ? "On floor" : e.status}
+          </span>
         </div>
-        {tags.length ? (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {tags.map((t) => (
-              <span key={t} className="text-[10px] rounded border border-white/10 px-1.5 py-0.5 text-mist-400">
-                {t}
-              </span>
-            ))}
-          </div>
-        ) : null}
       </div>
       {node.reports.map((child) => (
         <ChartNode key={child.employee.id} node={child} depth={depth + 1} deptName={deptName} />
@@ -72,10 +54,68 @@ function ChartNode({
   );
 }
 
+function FloorCard({
+  person,
+  deptName,
+  onToggle,
+}: {
+  person: FloorPerson;
+  deptName: (id: string | null) => string;
+  onToggle: (emp: Employee) => void;
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-white/10 bg-ink-900/55 px-4 py-4"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-medium">{person.title}</div>
+          <div className="text-xs text-mist-500 mt-0.5">{deptName(person.department_id)}</div>
+        </div>
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-wider",
+            person.work_state === "working"
+              ? "text-accent"
+              : person.work_state === "blocked"
+                ? "text-warn"
+                : person.work_state === "paused"
+                  ? "text-mist-500"
+                  : "text-mist-400"
+          )}
+        >
+          {workStateLabel(person.work_state)}
+        </span>
+      </div>
+      <p className="text-sm text-mist-300 mt-3 min-h-[2.5rem]">
+        {person.current_task?.title || "Available — waiting for the CEO to assign work"}
+      </p>
+      <button
+        onClick={() => onToggle(person)}
+        className="mt-3 inline-flex items-center gap-1.5 text-xs rounded-lg border border-white/10 px-2.5 py-1.5 hover:bg-white/5"
+      >
+        {person.status === "active" ? (
+          <>
+            <Pause className="h-3 w-3" /> Pause
+          </>
+        ) : (
+          <>
+            <Play className="h-3 w-3" /> Back on floor
+          </>
+        )}
+      </button>
+    </motion.div>
+  );
+}
+
 export default function OrgPage() {
   const [org, setOrg] = useState<OrgSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [deptName, setDeptName] = useState("");
   const [empForm, setEmpForm] = useState({
     title: "",
@@ -85,9 +125,6 @@ export default function OrgPage() {
     role_prompt: "",
     tags: "engineering",
   });
-  const [soulEmpId, setSoulEmpId] = useState("");
-  const [soulMd, setSoulMd] = useState("");
-  const [soulBusy, setSoulBusy] = useState(false);
 
   const load = useCallback(async () => {
     const companyId = getActiveCompany();
@@ -97,26 +134,32 @@ export default function OrgPage() {
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
+    const id = setInterval(() => {
+      load().catch(() => undefined);
+    }, 8000);
+    return () => clearInterval(id);
   }, [load]);
 
   const deptLabel = useMemo(() => {
     const map = new Map((org?.departments || []).map((d) => [d.id, d.name]));
-    return (id: string | null) => (id ? map.get(id) || "—" : "Unassigned");
+    return (id: string | null) => (id ? map.get(id) || "—" : "Company-wide");
   }, [org]);
 
-  async function seed() {
-    const companyId = getActiveCompany();
-    if (!companyId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      setOrg(await api.seedOrg(companyId));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Seed failed");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const floor = useMemo(() => {
+    if (org?.floor?.length) return org.floor;
+    return (org?.employees || []).map((e) => ({
+      ...e,
+      work_state: e.status === "paused" ? "paused" : "idle",
+      current_task: null,
+    }));
+  }, [org]);
+
+  const counts = useMemo(() => {
+    const working = floor.filter((p) => p.work_state === "working").length;
+    const waiting = floor.filter((p) => p.work_state === "blocked").length;
+    const available = floor.filter((p) => p.work_state === "idle").length;
+    return { working, waiting, available };
+  }, [floor]);
 
   async function addDepartment(e: FormEvent) {
     e.preventDefault();
@@ -147,7 +190,7 @@ export default function OrgPage() {
       await api.createEmployee(companyId, {
         title: empForm.title,
         codename: empForm.codename,
-        role_prompt: empForm.role_prompt || `${empForm.title} agent`,
+        role_prompt: empForm.role_prompt || `${empForm.title}`,
         department_id: empForm.department_id || null,
         manager_employee_id: empForm.manager_employee_id || org?.ceo?.id || null,
         status: "active",
@@ -177,219 +220,129 @@ export default function OrgPage() {
     await load();
   }
 
-  async function loadSoul(employeeId: string) {
-    const companyId = getActiveCompany();
-    if (!companyId || !employeeId) return;
-    setSoulEmpId(employeeId);
-    setSoulBusy(true);
-    try {
-      const res = await api.getSoul(companyId, employeeId);
-      setSoulMd(res.markdown);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Soul load failed");
-    } finally {
-      setSoulBusy(false);
-    }
-  }
-
-  async function saveSoul() {
-    const companyId = getActiveCompany();
-    if (!companyId || !soulEmpId) return;
-    setSoulBusy(true);
-    try {
-      const res = await api.putSoul(companyId, soulEmpId, soulMd);
-      setSoulMd(res.markdown);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Soul save failed");
-    } finally {
-      setSoulBusy(false);
-    }
-  }
-
   return (
-    <Shell title="Organization">
+    <Shell title="People" subtitle="Who’s on the floor — working, waiting, or available">
       <div className="space-y-6">
         <motion.section
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="surface rounded-2xl p-6 shadow-panel flex flex-wrap items-center justify-between gap-4"
+          className="surface rounded-2xl p-6 shadow-panel"
         >
-          <div>
-            <h2 className="font-display text-2xl">Org chart</h2>
-            <p className="text-sm text-mist-400 mt-1">
-              AI CEO is the root manager. Seed a startup template or craft the hierarchy by hand.
-            </p>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="font-display text-2xl">Company floor</h2>
+              <p className="text-sm text-mist-400 mt-1">
+                Staffed on opening day. Status updates as the CEO assigns work.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <span className="text-accent">{counts.working} working</span>
+              <span className="text-warn">{counts.waiting} waiting</span>
+              <span className="text-mist-400">{counts.available} available</span>
+            </div>
           </div>
-          <button
-            onClick={seed}
-            disabled={busy}
-            className="inline-flex items-center gap-2 rounded-xl bg-accent text-ink-950 px-4 py-2.5 text-sm font-medium hover:bg-accent-dim disabled:opacity-50"
-          >
-            <Sprout className="h-4 w-4" />
-            Seed startup template
-          </button>
         </motion.section>
 
         {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-        <div className="grid xl:grid-cols-5 gap-6">
-          <div className="xl:col-span-3 space-y-4">
-            <div className="surface rounded-2xl p-5 shadow-panel">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display text-lg">Reporting hierarchy</h3>
-                <span className="text-xs text-mist-500">
-                  {org?.employees.length || 0} employees · {org?.departments.length || 0} departments
-                </span>
-              </div>
-              {org?.chart?.length ? (
-                org.chart.map((n) => (
-                  <ChartNode key={n.employee.id} node={n} deptName={deptLabel} />
-                ))
-              ) : (
-                <p className="text-sm text-mist-400">No employees yet.</p>
-              )}
-            </div>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {floor.map((p) => (
+            <FloorCard key={p.id} person={p} deptName={deptLabel} onToggle={toggleStatus} />
+          ))}
+          {!floor.length ? (
+            <p className="text-sm text-mist-400">No people yet — create a company to auto-staff.</p>
+          ) : null}
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="surface rounded-2xl p-5 shadow-panel">
+            <h3 className="font-display text-lg mb-4">Reporting line</h3>
+            {org?.chart?.length ? (
+              org.chart.map((n) => (
+                <ChartNode key={n.employee.id} node={n} deptName={deptLabel} />
+              ))
+            ) : (
+              <p className="text-sm text-mist-400">Org chart appears after opening day.</p>
+            )}
           </div>
 
-          <div className="xl:col-span-2 space-y-4">
-            <form onSubmit={addDepartment} className="surface rounded-2xl p-5 space-y-3 shadow-panel">
-              <h3 className="font-display text-lg">Add department</h3>
-              <input
-                value={deptName}
-                onChange={(e) => setDeptName(e.target.value)}
-                placeholder="e.g. Design"
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
-              />
-              <button
-                type="submit"
-                disabled={busy || !deptName.trim()}
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm hover:bg-white/5 disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" /> Add
-              </button>
-              <ul className="space-y-2 pt-2">
-                {(org?.departments || []).map((d: Department) => (
-                  <li key={d.id} className="rounded-lg border border-white/10 px-3 py-2 text-sm">
-                    <div className="font-medium">{d.name}</div>
-                    <div className="text-xs text-mist-500">{d.description || "—"}</div>
-                  </li>
-                ))}
-              </ul>
-            </form>
-
-            <form onSubmit={addEmployee} className="surface rounded-2xl p-5 space-y-3 shadow-panel">
-              <h3 className="font-display text-lg">Add employee</h3>
-              <input
-                required
-                value={empForm.title}
-                onChange={(e) => setEmpForm({ ...empForm, title: e.target.value })}
-                placeholder="Title"
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
-              />
-              <input
-                required
-                value={empForm.codename}
-                onChange={(e) => setEmpForm({ ...empForm, codename: e.target.value })}
-                placeholder="codename"
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm font-mono outline-none focus:border-accent/40"
-              />
-              <select
-                value={empForm.department_id}
-                onChange={(e) => setEmpForm({ ...empForm, department_id: e.target.value })}
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
-              >
-                <option value="">No department</option>
-                {(org?.departments || []).map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={empForm.manager_employee_id}
-                onChange={(e) => setEmpForm({ ...empForm, manager_employee_id: e.target.value })}
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
-              >
-                <option value="">Manager: AI CEO (default)</option>
-                {(org?.employees || []).map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.title} (@{emp.codename})
-                  </option>
-                ))}
-              </select>
-              <input
-                value={empForm.tags}
-                onChange={(e) => setEmpForm({ ...empForm, tags: e.target.value })}
-                placeholder="capability tags (comma)"
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
-              />
-              <button
-                type="submit"
-                disabled={busy}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent/90 text-ink-950 px-3 py-2 text-sm font-medium disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" /> Hire agent
-              </button>
-            </form>
-
-            <div className="surface rounded-2xl p-5 shadow-panel">
-              <h3 className="font-display text-lg mb-3">Status controls</h3>
-              <div className="space-y-2 max-h-64 overflow-auto">
-                {(org?.employees || []).map((emp) => (
-                  <div key={emp.id} className="flex items-center justify-between gap-2 text-sm border border-white/10 rounded-lg px-3 py-2">
-                    <span>
-                      {emp.title}{" "}
-                      <span className="text-mist-500 font-mono text-xs">@{emp.codename}</span>
-                    </span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => loadSoul(emp.id)}
-                        className="text-xs rounded border border-white/10 px-2 py-1 hover:bg-white/5"
-                      >
-                        Soul
-                      </button>
-                      <button
-                        onClick={() => toggleStatus(emp)}
-                        className="inline-flex items-center gap-1 text-xs rounded border border-white/10 px-2 py-1 hover:bg-white/5"
-                      >
-                        {emp.status === "active" ? (
-                          <>
-                            <Pause className="h-3 w-3" /> Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-3 w-3" /> Activate
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="surface rounded-2xl p-5 shadow-panel space-y-3">
-              <h3 className="font-display text-lg">Employee Soul (Markdown)</h3>
-              <p className="text-xs text-mist-500">
-                Reviewable SOUL + pinned MEMORY — maps to role_prompt + employee-scoped memories.
-              </p>
-              <textarea
-                value={soulMd}
-                onChange={(e) => setSoulMd(e.target.value)}
-                rows={12}
-                placeholder="Select Soul on an employee…"
-                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-xs font-mono outline-none focus:border-accent/40"
-              />
-              <button
-                disabled={soulBusy || !soulEmpId}
-                onClick={saveSoul}
-                className="text-xs rounded-lg bg-accent text-ink-950 px-3 py-1.5 font-medium disabled:opacity-40"
-              >
-                Save Soul
-              </button>
-            </div>
+          <div className="surface rounded-2xl p-5 shadow-panel">
+            <h3 className="font-display text-lg mb-2">Departments</h3>
+            <ul className="space-y-2">
+              {(org?.departments || []).map((d: Department) => (
+                <li key={d.id} className="rounded-lg border border-white/10 px-3 py-2 text-sm">
+                  <div className="font-medium">{d.name}</div>
+                  <div className="text-xs text-mist-500">{d.description || "—"}</div>
+                </li>
+              ))}
+            </ul>
           </div>
+        </div>
+
+        <div className="surface rounded-2xl p-5 shadow-panel">
+          <button
+            type="button"
+            onClick={() => setShowAdmin((v) => !v)}
+            className="text-sm text-mist-400 hover:text-mist-200"
+          >
+            {showAdmin ? "Hide org admin" : "Org admin (hire / departments)"}
+          </button>
+          {showAdmin ? (
+            <div className="mt-4 grid md:grid-cols-2 gap-4">
+              <form onSubmit={addDepartment} className="space-y-3">
+                <h4 className="font-display text-base">Add department</h4>
+                <input
+                  value={deptName}
+                  onChange={(e) => setDeptName(e.target.value)}
+                  placeholder="e.g. Design"
+                  className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !deptName.trim()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm hover:bg-white/5 disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" /> Add
+                </button>
+              </form>
+              <form onSubmit={addEmployee} className="space-y-3">
+                <h4 className="font-display text-base">Hire someone</h4>
+                <input
+                  required
+                  value={empForm.title}
+                  onChange={(e) => setEmpForm({ ...empForm, title: e.target.value })}
+                  placeholder="Title"
+                  className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
+                />
+                <input
+                  required
+                  value={empForm.codename}
+                  onChange={(e) => setEmpForm({ ...empForm, codename: e.target.value })}
+                  placeholder="Short id (e.g. designer)"
+                  className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
+                />
+                <select
+                  value={empForm.department_id}
+                  onChange={(e) => setEmpForm({ ...empForm, department_id: e.target.value })}
+                  className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-accent/40"
+                >
+                  <option value="">No department</option>
+                  {(org?.departments || []).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent/90 text-ink-950 px-3 py-2 text-sm font-medium disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" /> Hire
+                </button>
+              </form>
+            </div>
+          ) : null}
         </div>
       </div>
     </Shell>

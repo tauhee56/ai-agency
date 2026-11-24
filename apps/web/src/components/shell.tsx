@@ -11,8 +11,6 @@ import {
   Network,
   Settings,
   ShieldCheck,
-  Sparkles,
-  Workflow,
 } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { api, getActiveCompany, setActiveCompany, setToken, type Company, type User } from "@/lib/api";
@@ -21,18 +19,25 @@ import { cn } from "@/lib/cn";
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/command-center", label: "Command Center", icon: Command },
-  { href: "/org", label: "Organization", icon: Network },
+  { href: "/org", label: "People", icon: Network },
   { href: "/approvals", label: "Needs you", icon: ShieldCheck },
-  { href: "/playbooks", label: "Playbooks", icon: Workflow },
-  { href: "/settings/models", label: "Models", icon: Sparkles },
-  { href: "/settings/account", label: "Account", icon: Settings },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function Shell({ children, title }: { children: ReactNode; title?: string }) {
+export function Shell({
+  children,
+  title,
+  subtitle,
+}: {
+  children: ReactNode;
+  title?: string;
+  subtitle?: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
+  const [needsYou, setNeedsYou] = useState(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -52,6 +57,12 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
         if (chosen) {
           setActiveCompany(chosen.id);
           setCompany(chosen);
+          try {
+            const ov = await api.overview(chosen.id);
+            if (!cancelled) setNeedsYou(ov.pulse?.needs_you || 0);
+          } catch {
+            /* ignore */
+          }
         }
         setReady(true);
       } catch {
@@ -62,7 +73,7 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, pathname]);
 
   function logout() {
     setToken(null);
@@ -73,7 +84,7 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
   if (!ready) {
     return (
       <div className="min-h-screen grid place-items-center bg-ink-950 bg-aurora">
-        <div className="text-mist-400 text-sm tracking-wide">Loading company OS…</div>
+        <div className="text-mist-400 text-sm tracking-wide">Opening your company…</div>
       </div>
     );
   }
@@ -87,16 +98,23 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
               <div className="h-9 w-9 rounded-lg bg-accent/15 border border-accent/30 grid place-items-center">
                 <Building2 className="h-4 w-4 text-accent" />
               </div>
-              <div>
-                <div className="font-display text-lg leading-none tracking-tight">AI Company OS</div>
-                <div className="text-[11px] uppercase tracking-[0.18em] text-mist-500 mt-1">Phase 1</div>
+              <div className="min-w-0">
+                <div className="font-display text-lg leading-none tracking-tight truncate">
+                  {company?.name || "Company OS"}
+                </div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-mist-500 mt-1">
+                  Your company
+                </div>
               </div>
             </div>
           </div>
 
           <nav className="flex-1 px-3 py-4 space-y-1">
             {NAV.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              const active =
+                item.href === "/settings"
+                  ? pathname.startsWith("/settings") || pathname.startsWith("/playbooks")
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
               const Icon = item.icon;
               return (
                 <Link
@@ -111,8 +129,10 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1">{item.label}</span>
-                  {item.stub ? (
-                    <span className="text-[10px] uppercase tracking-wider text-mist-500">Soon</span>
+                  {item.href === "/approvals" && needsYou > 0 ? (
+                    <span className="text-[10px] rounded-full bg-warn/20 text-warn px-1.5 py-0.5">
+                      {needsYou}
+                    </span>
                   ) : null}
                 </Link>
               );
@@ -120,10 +140,6 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
           </nav>
 
           <div className="px-4 py-4 border-t border-white/10 space-y-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-mist-500">Company</div>
-              <div className="text-sm font-medium truncate">{company?.name || "—"}</div>
-            </div>
             <div>
               <div className="text-[11px] uppercase tracking-wider text-mist-500">Founder</div>
               <div className="text-sm truncate">{user?.name}</div>
@@ -148,12 +164,14 @@ export function Shell({ children, title }: { children: ReactNode; title?: string
               >
                 {title || "Overview"}
               </motion.h1>
-              <p className="text-sm text-mist-400 mt-0.5">Founder command surface</p>
+              <p className="text-sm text-mist-400 mt-0.5">
+                {subtitle || "How the company is doing"}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-800/60 px-3 py-1 text-xs text-mist-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                Live feed ready
+                Company pulse live
               </span>
             </div>
           </header>

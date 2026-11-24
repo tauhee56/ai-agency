@@ -44,14 +44,14 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               className="font-display text-5xl leading-[1.05] max-w-md"
             >
-              Run your company with agents. You remain Founder.
+              Software that works as a company. You stay Founder.
             </motion.h1>
             <p className="mt-5 text-mist-300 max-w-md leading-relaxed">
-              Phase 1 foundation: auth, model registry, dashboard shell, and an AI CEO stub —
-              without wiring MetaGPT, CrewAI, or OpenHands yet.
+              Opening day staffs your org. Talk to the AI CEO, watch the floor, and clear
+              Needs you when only you can decide.
             </p>
           </div>
-          <p className="text-xs text-mist-500 uppercase tracking-[0.2em]">Premium dark enterprise</p>
+          <p className="text-xs text-mist-500 uppercase tracking-[0.2em]">Company OS</p>
         </div>
       </div>
 

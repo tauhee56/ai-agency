@@ -68,13 +68,14 @@ export default function ModelsPage() {
   }
 
   return (
-    <Shell title="Models">
+    <Shell title="Capabilities" subtitle="Settings · which providers the company may use">
       <div className="grid lg:grid-cols-2 gap-6">
         <form onSubmit={onSubmit} className="surface rounded-2xl p-6 space-y-4 shadow-panel">
           <div>
-            <h2 className="font-display text-xl">Add model provider</h2>
+            <h2 className="font-display text-xl">Add capability</h2>
             <p className="text-sm text-mist-400 mt-1">
-              Keys are encrypted at rest. Prefer env fallbacks only for local bootstrap.
+              Provider keys stay encrypted. Day-to-day work happens in Command Center — this is
+              only for integrations.
             </p>
           </div>
           <label className="block space-y-1.5">

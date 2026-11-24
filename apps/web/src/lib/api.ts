@@ -64,11 +64,16 @@ export type Employee = {
   capabilities: Record<string, unknown>;
 };
 export type OrgChartNode = { employee: Employee; reports: OrgChartNode[] };
+export type FloorPerson = Employee & {
+  work_state: string;
+  current_task: { id: string; title: string; status: string } | null;
+};
 export type OrgSnapshot = {
   departments: Department[];
   employees: Employee[];
   chart: OrgChartNode[];
   ceo: Employee | null;
+  floor?: FloorPerson[];
 };
 
 export class ApiError extends Error {
@@ -150,14 +155,49 @@ export const api = {
     request<{
       company: Company;
       role: string;
+      ceo: { id: string; title: string; status: string } | null;
+      pulse: {
+        employees: number;
+        departments: number;
+        active_projects: number;
+        needs_you: number;
+        people_working: number;
+        active_workstreams: number;
+      };
+      projects: { id: string; name: string; description: string }[];
+      departments: { id: string; name: string }[];
+      floor: {
+        id: string;
+        title: string;
+        codename: string;
+        status: string;
+        work_state: string;
+        current_task: { id: string; title: string; status: string } | null;
+      }[];
       model_status: {
         configured: boolean;
         count: number;
         default: { id: string; name: string; provider: string; model: string } | null;
       };
-      ceo: { id: string; title: string; status: string } | null;
       phase: number;
     }>(`/companies/${companyId}/overview`),
+  ceoDirect: (message: string, companyId?: string, startWork = true) =>
+    request<{
+      acknowledgment: string;
+      project: { id: string; name: string };
+      tasks: {
+        id: string;
+        title: string;
+        assignee: string | null;
+        assignee_codename: string | null;
+        department: string | null;
+      }[];
+      runs_started: string[];
+      summary: { people_assigned: string[]; departments: string[] };
+    }>("/ceo/direct", {
+      method: "POST",
+      body: JSON.stringify({ message, company_id: companyId, start_work: startWork }),
+    }),
   listModels: (companyId: string) => request<ModelConfig[]>(`/companies/${companyId}/models`),
   createModel: (
     companyId: string,

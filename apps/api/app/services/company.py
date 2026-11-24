@@ -54,4 +54,19 @@ def bootstrap_company(db: Session, *, name: str, founder_user_id: uuid.UUID) -> 
     )
     db.add(ceo)
     db.flush()
+
+    # Opening day: seed full org automatically
+    from app.services.org import seed_startup_default
+    from app.models.work import Project
+
+    seed_startup_default(db, company.id)
+    welcome = Project(
+        company_id=company.id,
+        name="Opening day",
+        description="Welcome project — your AI company is staffed and ready for direction.",
+        status="active",
+        owner_employee_id=ceo.id,
+    )
+    db.add(welcome)
+    db.flush()
     return company

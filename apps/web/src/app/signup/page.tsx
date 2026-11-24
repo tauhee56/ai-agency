@@ -46,13 +46,13 @@ export default function SignupPage() {
         className="w-full max-w-lg surface rounded-2xl p-8 shadow-panel space-y-4"
       >
         <div>
-          <h1 className="font-display text-3xl">Create your company</h1>
+          <h1 className="font-display text-3xl">Open your company</h1>
           <p className="text-sm text-mist-400 mt-2">
-            Bootstrap Founder account, tenancy, and an AI CEO employee stub.
+            Day one: we staff departments, seat an AI CEO, and land you on the company Overview.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <label className="block space-y-1.5 sm:col-span-1">
+          <label className="block space-y-1.5">
             <span className="text-xs uppercase tracking-wider text-mist-500">Your name</span>
             <input
               required
@@ -98,10 +98,10 @@ export default function SignupPage() {
           disabled={loading}
           className="w-full rounded-xl bg-accent text-ink-950 py-3 text-sm font-medium hover:bg-accent-dim disabled:opacity-50"
         >
-          {loading ? "Creating…" : "Create company OS"}
+          {loading ? "Opening day…" : "Create company"}
         </button>
         <p className="text-sm text-mist-400 text-center">
-          Already have access?{" "}
+          Already a Founder?{" "}
           <Link href="/login" className="text-accent hover:underline">
             Sign in
           </Link>
