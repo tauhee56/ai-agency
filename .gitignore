@@ -31,3 +31,4 @@ htmlcov/
 # local data
 data/
 *.sqlite
+dump.rdb
