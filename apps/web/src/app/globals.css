@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #07090d;
+  --foreground: #e8edf6;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100%;
+}
+
+* {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.28);
+}
+
+@layer utilities {
+  .surface {
+    @apply bg-ink-850/80 border border-white/10 backdrop-blur-md;
+  }
+  .hairline {
+    @apply border border-white/10;
+  }
+  .text-muted {
+    @apply text-mist-400;
+  }
+}

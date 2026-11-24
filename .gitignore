@@ -1,0 +1,33 @@
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.local
+.env.*.local
+
+# tooling
+.DS_Store
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.turbo/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# local data
+data/
+*.sqlite
