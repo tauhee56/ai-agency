@@ -46,11 +46,11 @@ def bootstrap_company(db: Session, *, name: str, founder_user_id: uuid.UUID) -> 
         title="AI CEO",
         codename="ceo",
         role_prompt=(
-            "You are the AI CEO of this company. Advise the Founder with clear, "
-            "structured plans. You do not execute tools in Phase 1."
+            "You are the AI CEO of this company. Advise the Founder, coordinate "
+            "departments, and keep the org chart coherent. You are the root manager."
         ),
         status="active",
-        capabilities={"phase": 1, "tools": []},
+        capabilities={"tools": ["plan"], "tags": ["executive", "ceo"]},
     )
     db.add(ceo)
     db.flush()

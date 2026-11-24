@@ -1,0 +1,15 @@
+Autonomous AI Company OS
+Copyright (c) 2026 AI Company OS contributors
+
+This product includes or may dynamically link the following third-party
+software. See THIRD_PARTY_LICENSES.md for full MIT license texts.
+
+- CrewAI — https://github.com/crewAIInc/crewAI — MIT — Copyright (c) 2025 crewAI, Inc.
+- MetaGPT — https://github.com/FoundationAgents/MetaGPT — MIT — Copyright (c) 2024 Chenglin Wu
+  (optional adapter; Python <3.12 worker; disabled by default)
+- OpenHands / software-agent-sdk — https://github.com/OpenHands/OpenHands — MIT
+  Copyright © 2025–2026 OpenHands contributors
+  (Phase 4 stub on this VM; Agent Server path when Docker available)
+
+Platform application code in apps/api and apps/web is separate from upstream
+frameworks and does not relicense them.

@@ -42,6 +42,34 @@ export type CeoAdvise = {
   model_used: string | null;
   stub: boolean;
 };
+export type Department = {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string;
+  parent_department_id: string | null;
+  lead_employee_id: string | null;
+};
+export type Employee = {
+  id: string;
+  company_id: string;
+  title: string;
+  codename: string;
+  role_prompt: string;
+  department_id: string | null;
+  manager_employee_id: string | null;
+  model_config_id: string | null;
+  adapter_pref: string | null;
+  status: string;
+  capabilities: Record<string, unknown>;
+};
+export type OrgChartNode = { employee: Employee; reports: OrgChartNode[] };
+export type OrgSnapshot = {
+  departments: Department[];
+  employees: Employee[];
+  chart: OrgChartNode[];
+  ceo: Employee | null;
+};
 
 export class ApiError extends Error {
   status: number;
@@ -159,4 +187,100 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message, company_id: companyId }),
     }),
+  getOrg: (companyId: string) => request<OrgSnapshot>(`/companies/${companyId}/org`),
+  seedOrg: (companyId: string) =>
+    request<OrgSnapshot>(`/companies/${companyId}/org/seed`, {
+      method: "POST",
+      body: JSON.stringify({ template: "startup_default" }),
+    }),
+  createDepartment: (
+    companyId: string,
+    body: { name: string; description?: string; parent_department_id?: string | null }
+  ) =>
+    request<Department>(`/companies/${companyId}/departments`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createEmployee: (companyId: string, body: Record<string, unknown>) =>
+    request<Employee>(`/companies/${companyId}/employees`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateEmployee: (companyId: string, employeeId: string, body: Record<string, unknown>) =>
+    request<Employee>(`/companies/${companyId}/employees/${employeeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteEmployee: (companyId: string, employeeId: string) =>
+    request<void>(`/companies/${companyId}/employees/${employeeId}`, { method: "DELETE" }),
+  requestProjects: (companyId: string) =>
+    request<{ id: string; name: string; description: string; status: string }[]>(
+      `/companies/${companyId}/projects`
+    ),
+  createProject: (companyId: string, body: { name: string; description?: string }) =>
+    request<{ id: string; name: string; description: string; status: string }>(
+      `/companies/${companyId}/projects`,
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+  requestTasks: (companyId: string) =>
+    request<{ id: string; title: string; status: string; project_id: string; adapter: string | null }[]>(
+      `/companies/${companyId}/tasks`
+    ),
+  createTask: (companyId: string, body: Record<string, unknown>) =>
+    request<{ id: string; title: string; status: string; project_id: string; adapter: string | null }>(
+      `/companies/${companyId}/tasks`,
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+  runTask: (companyId: string, taskId: string) =>
+    request<{
+      id: string;
+      task_id: string;
+      adapter: string;
+      status: string;
+      summary: string | null;
+      error: string | null;
+      usage: Record<string, unknown>;
+    }>(`/companies/${companyId}/tasks/${taskId}/run`, { method: "POST" }),
+  requestRuns: (companyId: string) =>
+    request<
+      {
+        id: string;
+        task_id: string;
+        adapter: string;
+        status: string;
+        summary: string | null;
+        error: string | null;
+        usage: Record<string, unknown>;
+      }[]
+    >(`/companies/${companyId}/runs`),
+  requestBudget: (companyId: string) =>
+    request<{ soft_limit_usd: number; hard_limit_usd: number; spent_usd: number; blocked: boolean }>(
+      `/companies/${companyId}/budget`
+    ),
+  updateBudget: (companyId: string, body: { soft_limit_usd?: number; hard_limit_usd?: number }) =>
+    request<{ soft_limit_usd: number; hard_limit_usd: number; spent_usd: number; blocked: boolean }>(
+      `/companies/${companyId}/budget`,
+      { method: "PATCH", body: JSON.stringify(body) }
+    ),
+  requestApprovals: (companyId: string) =>
+    request<
+      {
+        id: string;
+        action_tag: string;
+        title: string;
+        status: string;
+        payload: Record<string, unknown>;
+        decision_note: string | null;
+      }[]
+    >(`/companies/${companyId}/approvals`),
+  decideApproval: (
+    companyId: string,
+    approvalId: string,
+    body: { decision: "approved" | "rejected"; note?: string }
+  ) =>
+    request(`/companies/${companyId}/approvals/${approvalId}/decide`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  requestFeatures: () => request<Record<string, unknown>>("/features"),
 };

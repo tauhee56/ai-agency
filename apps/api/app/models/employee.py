@@ -11,8 +11,6 @@ from app.db import Base
 
 
 class Employee(Base):
-    """P1 stub: optional AI CEO row at company bootstrap."""
-
     __tablename__ = "employees"
     __table_args__ = (UniqueConstraint("company_id", "codename", name="uq_employees_company_codename"),)
 
@@ -20,11 +18,15 @@ class Employee(Base):
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
     )
-    department_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+    )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     codename: Mapped[str] = mapped_column(Text, nullable=False)
     role_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    manager_employee_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    manager_employee_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True
+    )
     model_config_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("model_configs.id", ondelete="SET NULL"), nullable=True
     )
@@ -37,3 +39,8 @@ class Employee(Base):
     )
 
     company = relationship("Company", back_populates="employees")
+    department = relationship(
+        "Department",
+        back_populates="employees",
+        foreign_keys=[department_id],
+    )

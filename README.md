@@ -1,11 +1,14 @@
-# Autonomous AI Company OS — Phase 1 Foundation
+# Autonomous AI Company OS
 
-Monorepo for the company OS platform. Phase 1 ships **without** MetaGPT, CrewAI, or OpenHands.
+Monorepo for the company OS platform (Phases 1–6 on this VM; OpenHands/MetaGPT partial).
 
 ```
 apps/
-  api/   FastAPI + Postgres (auth, models, CEO stub, WS/SSE)
-  web/   Next.js dark enterprise dashboard
+  api/                      FastAPI platform (no MetaGPT/CrewAI/OpenHands imports)
+  web/                      Next.js dark enterprise dashboard
+  workers/crewai_adapter/   Separate CrewAI protocol worker
+  workers/openhands_adapter Stub/OpenHands worker (Docker blocked here)
+  workers/metagpt_adapter/  Optional Py3.11 worker (disabled)
 ```
 
 ## Prerequisites
@@ -86,6 +89,22 @@ docker compose up --build
 - JWT auth via `JWT_SECRET`.
 - No MetaGPT / CrewAI / OpenHands packages in `apps/api/requirements.txt`.
 
-## Out of scope (later phases)
+## Workers
 
-Org chart UI, multi-agent adapters, OpenHands sandboxes, approvals inbox, business playbooks.
+```bash
+# CrewAI adapter (mock by default)
+REDIS_URL=redis://localhost:6379/0 CREWAI_FORCE_MOCK=1 OTEL_SDK_DISABLED=true \
+  python apps/workers/crewai_adapter/worker.py
+
+# OpenHands stub (Docker not required)
+REDIS_URL=redis://localhost:6379/0 OPENHANDS_STUB=1 \
+  python apps/workers/openhands_adapter/worker.py
+```
+
+## Phase docs
+
+Ship notes live under the Project store: `docs/ai-company-os/PHASE{1-6}_SHIPPED.md`.
+
+## Licenses
+
+See `NOTICE` and `THIRD_PARTY_LICENSES.md`.

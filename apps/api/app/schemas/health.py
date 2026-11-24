@@ -5,4 +5,4 @@ class HealthResponse(BaseModel):
     status: str
     db: bool
     redis: bool
-    version: str = "0.1.0-phase1"
+    version: str = "0.3.0-phase3"

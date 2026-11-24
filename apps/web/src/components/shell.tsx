@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { api, getActiveCompany, setActiveCompany, setToken, type Company, type User } from "@/lib/api";
@@ -19,9 +20,10 @@ import { cn } from "@/lib/cn";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/command-center", label: "Command Center", icon: Command, stub: true },
-  { href: "/org", label: "Organization", icon: Network, stub: true },
-  { href: "/approvals", label: "Approvals", icon: ShieldCheck, stub: true },
+  { href: "/command-center", label: "Command Center", icon: Command },
+  { href: "/org", label: "Organization", icon: Network },
+  { href: "/approvals", label: "Approvals", icon: ShieldCheck },
+  { href: "/playbooks", label: "Playbooks", icon: Workflow },
   { href: "/settings/models", label: "Models", icon: Sparkles },
   { href: "/settings/account", label: "Account", icon: Settings },
 ];

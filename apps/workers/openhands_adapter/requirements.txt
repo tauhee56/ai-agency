@@ -1,0 +1,4 @@
+redis==5.2.1
+httpx==0.28.1
+# Real OpenHands Agent Server client deps go here when Docker + server are available.
+# Do not install into apps/api.

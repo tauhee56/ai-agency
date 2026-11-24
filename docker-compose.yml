@@ -60,5 +60,16 @@ services:
     depends_on:
       - api
 
+  crewai-adapter:
+    build:
+      context: ./apps/workers/crewai_adapter
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      OTEL_SDK_DISABLED: "true"
+      CREWAI_FORCE_MOCK: ${CREWAI_FORCE_MOCK:-1}
+    depends_on:
+      redis:
+        condition: service_healthy
+
 volumes:
   pgdata:

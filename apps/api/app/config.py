@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
     openai_base_url: str | None = None
+    metagpt_enabled: bool = False
+    openhands_enabled: bool = True  # stub worker allowed without Docker
 
     @property
     def cors_origin_list(self) -> list[str]:

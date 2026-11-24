@@ -1,0 +1,5 @@
+redis==5.2.1
+httpx==0.28.1
+# CrewAI is optional at install time; worker falls back to protocol-compatible mock
+# if import fails. Pin when installing for real runs:
+# crewai==0.95.0

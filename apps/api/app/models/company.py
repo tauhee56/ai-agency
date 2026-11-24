@@ -28,6 +28,7 @@ class Company(Base):
     memberships = relationship("Membership", back_populates="company", cascade="all, delete-orphan")
     model_configs = relationship("ModelConfig", back_populates="company", cascade="all, delete-orphan")
     employees = relationship("Employee", back_populates="company", cascade="all, delete-orphan")
+    departments = relationship("Department", back_populates="company", cascade="all, delete-orphan")
 
 
 class Membership(Base):
