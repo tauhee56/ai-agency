@@ -13,3 +13,7 @@ software. See THIRD_PARTY_LICENSES.md for full MIT license texts.
 
 Platform application code in apps/api and apps/web is separate from upstream
 frameworks and does not relicense them.
+
+Orca (https://github.com/stablyai/orca) — MIT — Copyright (c) 2026 Lovecast Inc.
+  Concepts only (Needs you, Soul Markdown, schedules, dispatch/heartbeat, draft-first
+  connectors, workspace-per-run). No Orca source merged.

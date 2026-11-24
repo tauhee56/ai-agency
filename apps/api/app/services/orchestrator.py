@@ -156,25 +156,34 @@ async def enqueue_task_run(
 
     check_budget_or_raise(db, task.company_id)
 
+    dispatch_id = uuid4()
     run = TaskRun(
         id=uuid4(),
         task_id=task.id,
         company_id=task.company_id,
         adapter=chosen,
         status="queued",
+        dispatch_id=dispatch_id,
+        terminal_received=False,
     )
     db.add(run)
     task.status = "ready"
     db.flush()
-    append_event(db, run.id, "run.queued", {"adapter": chosen})
+    append_event(
+        db,
+        run.id,
+        "run.queued",
+        {"adapter": chosen, "dispatch_id": str(dispatch_id), "protocol": "1.1"},
+    )
 
     project = db.get(Project, task.project_id)
     budget = ensure_company_budget(db, task.company_id)
     remaining = float(Decimal(budget.hard_limit_usd) - Decimal(budget.spent_usd))
 
     job = {
-        "adapter_protocol_version": 1,
+        "adapter_protocol_version": 1.1,
         "job_id": str(uuid4()),
+        "dispatch_id": str(dispatch_id),
         "company_id": str(task.company_id),
         "project_id": str(task.project_id),
         "task_id": str(task.id),
@@ -188,11 +197,17 @@ async def enqueue_task_run(
         },
         "org_snapshot": build_org_snapshot(db, task.company_id),
         "model_bindings": model_bindings(db, task.company_id),
+        "workspace": {
+            "root_required": f"/tmp/aicos-openhands/{run.id}" if chosen == "openhands" else None,
+            "isolation": "per_run_id",
+        },
         "policy": {
             "max_budget_usd": max(remaining, 0),
             "timeout_sec": 1800,
             "allowed_tools": ["search", "write"],
             "require_approval_for": ["external", "payment", "deploy", "destructive"],
+            "heartbeat_interval_sec": 30,
+            "single_terminal_completion": True,
         },
         "callback": {
             "events_ws_channel": f"run:{run.id}",
@@ -201,7 +216,11 @@ async def enqueue_task_run(
     }
     enqueue_job(job)
     db.commit()
-    await activity_hub.publish(task.company_id, "run.queued", {"run_id": str(run.id), "adapter": chosen})
+    await activity_hub.publish(
+        task.company_id,
+        "run.queued",
+        {"run_id": str(run.id), "dispatch_id": str(dispatch_id), "adapter": chosen},
+    )
     return run
 
 
@@ -210,12 +229,35 @@ def apply_worker_result(db: Session, result: dict[str, Any]) -> TaskRun | None:
     run = db.get(TaskRun, run_id)
     if not run:
         return None
+    # Single terminal completion (protocol v1.1)
+    if run.terminal_received:
+        append_event(
+            db,
+            run.id,
+            "run.duplicate_terminal_ignored",
+            {"dispatch_id": str(run.dispatch_id) if run.dispatch_id else None},
+        )
+        db.commit()
+        return run
+
+    if result.get("dispatch_id") and run.dispatch_id and str(run.dispatch_id) != str(result.get("dispatch_id")):
+        append_event(db, run.id, "run.dispatch_mismatch", {"got": result.get("dispatch_id")})
+        db.commit()
+        return run
+
     run.status = result.get("status", "failed")
+    run.outcome = result.get("outcome") or result.get("status")
     run.summary = result.get("summary")
     run.usage = result.get("usage") or {}
     run.upstream = result.get("upstream") or {}
     run.error = result.get("error")
+    run.terminal_received = True
     run.finished_at = datetime.now(UTC)
+    if result.get("heartbeat_at"):
+        try:
+            run.heartbeat_at = datetime.fromisoformat(str(result["heartbeat_at"]).replace("Z", "+00:00"))
+        except ValueError:
+            run.heartbeat_at = datetime.now(UTC)
     if not run.started_at:
         run.started_at = run.finished_at
 
@@ -249,20 +291,39 @@ def apply_worker_result(db: Session, result: dict[str, Any]) -> TaskRun | None:
             )
         )
 
+    from app.services.approvals_meta import suggested_actions_for, waiting_on_for
+
     for pending in result.get("approvals_needed") or []:
+        tag = pending.get("action_tag") or "external"
+        payload = pending.get("payload") or {}
+        waiting = waiting_on_for(tag, {**payload, **pending})
+        actions = pending.get("suggested_actions") or suggested_actions_for(tag, waiting)
         db.add(
             Approval(
                 company_id=run.company_id,
                 run_id=run.id,
                 task_id=run.task_id,
-                action_tag=pending.get("action_tag") or "external",
-                title=pending.get("title") or "Approval required",
-                payload=pending.get("payload") or {},
+                action_tag=tag,
+                title=pending.get("title") or "Needs you",
+                payload=payload,
+                waiting_on=waiting,
+                suggested_actions=actions,
                 status="pending",
             )
         )
 
-    append_event(db, run.id, f"run.{run.status}", {"summary": run.summary})
+    # Exactly one terminal completion event (protocol v1.1)
+    append_event(
+        db,
+        run.id,
+        "run.finished",
+        {
+            "outcome": run.outcome or run.status,
+            "status": run.status,
+            "summary": run.summary,
+            "dispatch_id": str(run.dispatch_id) if run.dispatch_id else None,
+        },
+    )
 
     # Memory writeback for completed playbooks / research runs
     if run.status == "succeeded" and run.summary:

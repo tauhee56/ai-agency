@@ -52,6 +52,10 @@ class TaskRunOut(BaseModel):
     company_id: UUID
     adapter: str
     status: str
+    dispatch_id: UUID | None = None
+    heartbeat_at: Any | None = None
+    outcome: str | None = None
+    terminal_received: bool = False
     summary: str | None
     usage: dict[str, Any]
     upstream: dict[str, Any]
@@ -79,6 +83,8 @@ class ApprovalOut(BaseModel):
     action_tag: str
     title: str
     payload: dict[str, Any]
+    waiting_on: str = "founder"
+    suggested_actions: list[dict[str, Any]] = []
     status: str
     decision_note: str | None
 

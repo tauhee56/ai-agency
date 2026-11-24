@@ -5,6 +5,7 @@ from app.models.employee import Employee
 from app.models.model_config import ModelConfig
 from app.models.user import User
 from app.models.memory import Memory
+from app.models.schedule import PlaybookSchedule
 from app.models.work import (
     Approval,
     Artifact,
@@ -33,4 +34,5 @@ __all__ = [
     "UsageRecord",
     "Artifact",
     "Memory",
+    "PlaybookSchedule",
 ]

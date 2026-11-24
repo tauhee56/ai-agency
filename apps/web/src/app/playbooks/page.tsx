@@ -4,6 +4,101 @@ import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/shell";
 import { api, getActiveCompany, getApiUrl } from "@/lib/api";
 
+function SchedulesPanel() {
+  const [rows, setRows] = useState<
+    {
+      id: string;
+      playbook_id: string;
+      name: string;
+      cron: string | null;
+      trigger: string;
+      enabled: boolean;
+      last_run_status: string | null;
+    }[]
+  >([]);
+  const [name, setName] = useState("Hourly research");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const companyId = getActiveCompany();
+    if (!companyId) return;
+    setRows(await api.listSchedules(companyId));
+  }, []);
+
+  useEffect(() => {
+    load().catch(() => undefined);
+  }, [load]);
+
+  async function create() {
+    const companyId = getActiveCompany();
+    if (!companyId) return;
+    await api.createSchedule(companyId, {
+      playbook_id: "research_brief",
+      name,
+      cron: "@hourly",
+      trigger: "cron",
+      goal_template: "Scheduled research tick",
+      enabled: true, // ignored — API forces disabled-by-default
+    });
+    setMsg("Created disabled-by-default; enable to arm.");
+    await load();
+  }
+
+  async function toggle(id: string, enabled: boolean) {
+    const companyId = getActiveCompany();
+    if (!companyId) return;
+    await api.updateSchedule(companyId, id, { enabled: !enabled });
+    await load();
+  }
+
+  async function runNow(id: string) {
+    const companyId = getActiveCompany();
+    if (!companyId) return;
+    const res = (await api.runSchedule(companyId, id)) as { run_id?: string };
+    setMsg(`Fired run ${res.run_id || ""}`);
+    await load();
+  }
+
+  return (
+    <div className="surface rounded-2xl p-5 shadow-panel space-y-3">
+      <h2 className="font-display text-xl">Playbook schedules</h2>
+      <p className="text-xs text-mist-500">Cron/webhook triggers — created disabled by default.</p>
+      {msg ? <p className="text-xs text-accent">{msg}</p> : null}
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="flex-1 rounded-xl bg-ink-900 border border-white/10 px-3 py-2 text-sm"
+        />
+        <button onClick={create} className="text-xs rounded-lg bg-accent text-ink-950 px-3 py-2 font-medium">
+          Add schedule
+        </button>
+      </div>
+      <div className="space-y-2">
+        {rows.map((s) => (
+          <div key={s.id} className="flex items-center justify-between gap-2 text-sm border border-white/10 rounded-lg px-3 py-2">
+            <div>
+              <div className="font-medium">{s.name}</div>
+              <div className="text-xs text-mist-500 font-mono">
+                {s.playbook_id} · {s.trigger} · {s.cron} · {s.enabled ? "enabled" : "disabled"} ·{" "}
+                {s.last_run_status || "—"}
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <button onClick={() => toggle(s.id, s.enabled)} className="text-xs border border-white/10 rounded px-2 py-1">
+                {s.enabled ? "Disable" : "Enable"}
+              </button>
+              <button onClick={() => runNow(s.id)} className="text-xs border border-accent/30 text-accent rounded px-2 py-1">
+                Run now
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type Playbook = {
   id: string;
   name: string;
@@ -151,6 +246,8 @@ export default function PlaybooksPage() {
             Draft Slack message (approval-gated)
           </button>
         </div>
+
+        <SchedulesPanel />
 
         <div className="surface rounded-2xl p-5 shadow-panel">
           <h2 className="font-display text-xl mb-3">Memory</h2>

@@ -8,7 +8,21 @@ from sqlalchemy import text
 from app.config import get_settings
 from app.db import Base, engine
 from app.middleware_security import RateLimitMiddleware
-from app.routers import activity, admin, auth, ceo, companies, health, models, ops, org, work
+from app.routers import (
+    activity,
+    admin,
+    auth,
+    ceo,
+    companies,
+    health,
+    models,
+    ops,
+    org,
+    schedules,
+    soul,
+    webhooks,
+    work,
+)
 from app.services.result_listener import result_listener_loop
 
 # Import models so metadata is registered
@@ -16,6 +30,19 @@ from app import models as _models  # noqa: F401
 
 _stop = asyncio.Event()
 _listener_task: asyncio.Task | None = None
+
+
+def _soft_migrate(conn) -> None:
+    stmts = [
+        "ALTER TABLE task_runs ADD COLUMN IF NOT EXISTS dispatch_id uuid",
+        "ALTER TABLE task_runs ADD COLUMN IF NOT EXISTS heartbeat_at timestamptz",
+        "ALTER TABLE task_runs ADD COLUMN IF NOT EXISTS outcome text",
+        "ALTER TABLE task_runs ADD COLUMN IF NOT EXISTS terminal_received boolean NOT NULL DEFAULT false",
+        "ALTER TABLE approvals ADD COLUMN IF NOT EXISTS waiting_on text NOT NULL DEFAULT 'founder'",
+        "ALTER TABLE approvals ADD COLUMN IF NOT EXISTS suggested_actions jsonb NOT NULL DEFAULT '[]'::jsonb",
+    ]
+    for s in stmts:
+        conn.execute(text(s))
 
 
 def init_db() -> None:
@@ -33,6 +60,7 @@ def init_db() -> None:
                 """
             )
         )
+        _soft_migrate(conn)
 
 
 @asynccontextmanager
@@ -50,12 +78,12 @@ async def lifespan(_app: FastAPI):
 settings = get_settings()
 app = FastAPI(
     title="Autonomous AI Company OS API",
-    version="0.6.0-phase6",
-    description="Phases 1–6: foundation through production hardening (partial).",
+    version="0.6.1-orca",
+    description="Orca must-have concept adoptions on Phases 1–6 foundation.",
     lifespan=lifespan,
 )
 
-app.add_middleware(RateLimitMiddleware, limit=120, window=60)
+app.add_middleware(RateLimitMiddleware, limit=300, window=60)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -70,8 +98,11 @@ app.include_router(companies.router)
 app.include_router(models.router)
 app.include_router(ceo.router)
 app.include_router(org.router)
+app.include_router(soul.router)
 app.include_router(work.router)
 app.include_router(ops.router)
+app.include_router(schedules.router)
+app.include_router(webhooks.router)
 app.include_router(admin.router)
 app.include_router(activity.router)
 
@@ -81,8 +112,10 @@ def root() -> dict:
     return {
         "name": "ai-company-os",
         "phase": 6,
+        "adapter_protocol": "1.1",
         "docs": "/docs",
         "metagpt": "disabled" if not settings.metagpt_enabled else "enabled",
         "openhands": "stub" if settings.openhands_enabled else "disabled",
         "hardening": "partial",
+        "orca_adoptions": ["M1", "M2", "M3", "M4", "M5", "M6"],
     }

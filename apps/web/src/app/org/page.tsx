@@ -85,6 +85,9 @@ export default function OrgPage() {
     role_prompt: "",
     tags: "engineering",
   });
+  const [soulEmpId, setSoulEmpId] = useState("");
+  const [soulMd, setSoulMd] = useState("");
+  const [soulBusy, setSoulBusy] = useState(false);
 
   const load = useCallback(async () => {
     const companyId = getActiveCompany();
@@ -172,6 +175,36 @@ export default function OrgPage() {
     const next = emp.status === "active" ? "paused" : "active";
     await api.updateEmployee(companyId, emp.id, { status: next });
     await load();
+  }
+
+  async function loadSoul(employeeId: string) {
+    const companyId = getActiveCompany();
+    if (!companyId || !employeeId) return;
+    setSoulEmpId(employeeId);
+    setSoulBusy(true);
+    try {
+      const res = await api.getSoul(companyId, employeeId);
+      setSoulMd(res.markdown);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Soul load failed");
+    } finally {
+      setSoulBusy(false);
+    }
+  }
+
+  async function saveSoul() {
+    const companyId = getActiveCompany();
+    if (!companyId || !soulEmpId) return;
+    setSoulBusy(true);
+    try {
+      const res = await api.putSoul(companyId, soulEmpId, soulMd);
+      setSoulMd(res.markdown);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Soul save failed");
+    } finally {
+      setSoulBusy(false);
+    }
   }
 
   return (
@@ -309,23 +342,52 @@ export default function OrgPage() {
                       {emp.title}{" "}
                       <span className="text-mist-500 font-mono text-xs">@{emp.codename}</span>
                     </span>
-                    <button
-                      onClick={() => toggleStatus(emp)}
-                      className="inline-flex items-center gap-1 text-xs rounded border border-white/10 px-2 py-1 hover:bg-white/5"
-                    >
-                      {emp.status === "active" ? (
-                        <>
-                          <Pause className="h-3 w-3" /> Pause
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-3 w-3" /> Activate
-                        </>
-                      )}
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => loadSoul(emp.id)}
+                        className="text-xs rounded border border-white/10 px-2 py-1 hover:bg-white/5"
+                      >
+                        Soul
+                      </button>
+                      <button
+                        onClick={() => toggleStatus(emp)}
+                        className="inline-flex items-center gap-1 text-xs rounded border border-white/10 px-2 py-1 hover:bg-white/5"
+                      >
+                        {emp.status === "active" ? (
+                          <>
+                            <Pause className="h-3 w-3" /> Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-3 w-3" /> Activate
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="surface rounded-2xl p-5 shadow-panel space-y-3">
+              <h3 className="font-display text-lg">Employee Soul (Markdown)</h3>
+              <p className="text-xs text-mist-500">
+                Reviewable SOUL + pinned MEMORY — maps to role_prompt + employee-scoped memories.
+              </p>
+              <textarea
+                value={soulMd}
+                onChange={(e) => setSoulMd(e.target.value)}
+                rows={12}
+                placeholder="Select Soul on an employee…"
+                className="w-full rounded-xl bg-ink-900 border border-white/10 px-3 py-2.5 text-xs font-mono outline-none focus:border-accent/40"
+              />
+              <button
+                disabled={soulBusy || !soulEmpId}
+                onClick={saveSoul}
+                className="text-xs rounded-lg bg-accent text-ink-950 px-3 py-1.5 font-medium disabled:opacity-40"
+              >
+                Save Soul
+              </button>
             </div>
           </div>
         </div>

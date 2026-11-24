@@ -184,12 +184,25 @@ async def integration_draft(
     """Draft-only integration — does not send externally without approval."""
     require_membership(db, company_id, user.id)
     from app.models.work import Approval
+    from app.services.approvals_meta import suggested_actions_for, waiting_on_for
+    from app.services.webhook_hygiene import connector_defaults
 
+    defaults = connector_defaults(body.channel)
+    if defaults.get("mode") != "draft_only" and body.channel in ("email", "slack", "notion"):
+        raise HTTPException(status_code=400, detail="Channel must be draft-first")
+    waiting = waiting_on_for("external", {"waiting_on": "external"})
     approval = Approval(
         company_id=company_id,
         action_tag="external",
-        title=f"Approve {body.channel} send",
-        payload={"channel": body.channel, "subject": body.subject, "body": body.body[:2000]},
+        title=f"Needs you: approve {body.channel} send",
+        payload={
+            "channel": body.channel,
+            "subject": body.subject,
+            "body": body.body[:2000],
+            "connector": defaults,
+        },
+        waiting_on=waiting,
+        suggested_actions=suggested_actions_for("external", waiting),
         status="pending",
     )
     db.add(approval)

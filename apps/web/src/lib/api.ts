@@ -270,9 +270,39 @@ export const api = {
         title: string;
         status: string;
         payload: Record<string, unknown>;
+        waiting_on?: string;
+        suggested_actions?: { id: string; label: string; decision: "approved" | "rejected" }[];
         decision_note: string | null;
       }[]
     >(`/companies/${companyId}/approvals`),
+  getSoul: (companyId: string, employeeId: string) =>
+    request<{ employee_id: string; markdown: string }>(
+      `/companies/${companyId}/employees/${employeeId}/soul`
+    ),
+  putSoul: (companyId: string, employeeId: string, markdown: string) =>
+    request<{ employee_id: string; markdown: string }>(
+      `/companies/${companyId}/employees/${employeeId}/soul`,
+      { method: "PUT", body: JSON.stringify({ markdown }) }
+    ),
+  listSchedules: (companyId: string) =>
+    request<
+      {
+        id: string;
+        playbook_id: string;
+        name: string;
+        cron: string | null;
+        trigger: string;
+        enabled: boolean;
+        goal_template: string;
+        last_run_status: string | null;
+      }[]
+    >(`/companies/${companyId}/schedules`),
+  createSchedule: (companyId: string, body: Record<string, unknown>) =>
+    request(`/companies/${companyId}/schedules`, { method: "POST", body: JSON.stringify(body) }),
+  updateSchedule: (companyId: string, id: string, body: Record<string, unknown>) =>
+    request(`/companies/${companyId}/schedules/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  runSchedule: (companyId: string, id: string) =>
+    request(`/companies/${companyId}/schedules/${id}/run`, { method: "POST" }),
   decideApproval: (
     companyId: string,
     approvalId: string,

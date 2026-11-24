@@ -22,7 +22,7 @@ const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/command-center", label: "Command Center", icon: Command },
   { href: "/org", label: "Organization", icon: Network },
-  { href: "/approvals", label: "Approvals", icon: ShieldCheck },
+  { href: "/approvals", label: "Needs you", icon: ShieldCheck },
   { href: "/playbooks", label: "Playbooks", icon: Workflow },
   { href: "/settings/models", label: "Models", icon: Sparkles },
   { href: "/settings/account", label: "Account", icon: Settings },

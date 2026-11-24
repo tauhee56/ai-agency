@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
     metagpt_enabled: bool = False
     openhands_enabled: bool = True  # stub worker allowed without Docker
+    webhook_shared_secret: str = "dev-webhook-secret"
 
     @property
     def cors_origin_list(self) -> list[str]:

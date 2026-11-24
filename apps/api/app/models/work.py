@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Numeric, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,6 +69,10 @@ class TaskRun(Base):
     )
     adapter: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="queued")
+    dispatch_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
+    terminal_received: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -111,6 +115,8 @@ class Approval(Base):
     action_tag: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    waiting_on: Mapped[str] = mapped_column(Text, nullable=False, default="founder")
+    suggested_actions: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
     decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
